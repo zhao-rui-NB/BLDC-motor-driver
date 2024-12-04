@@ -2,7 +2,7 @@ import serial
 import struct
 
 # 串行端口配置
-ser = serial.Serial('COM4', 115200, timeout=2)  # 確保 COM 端口與波特率設定正確
+ser = serial.Serial('COM4', 115200, timeout=2, inter_byte_timeout=0.5)  # 確保 COM 端口與波特率設定正確
 
 
 FRAME_HEAD = 0xAA

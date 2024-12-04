@@ -17,7 +17,6 @@ void reply_status(uint8_t status){
     uart_write_bytes(reply_buffer, 3);    
 }
 
-// float
 void reply_status_float(uint8_t status, float value){
     // frame head + status + value(4) + checksum
     uint8_t reply_buffer[7] = {FRAME_HEAD, status,0,0,0,0,0};
@@ -46,8 +45,6 @@ void reply_status_uint16(uint8_t status, uint16_t value){
     }
     uart_write_bytes(reply_buffer, 5);
 }
-
-
 
 
 // 指令解析與處理
@@ -204,7 +201,6 @@ void parse_command(uint8_t *buffer, uint8_t length) {
         default:
             reply_status(STATUS_INVALID_CMD);
             break;
-
         
     }
 }

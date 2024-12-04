@@ -5,15 +5,15 @@
 #include "BLDC_Driver.h"
 #include "uart.h"
 
+// timer on mos driver pin
+// P1.2 TA0.1 CH PWM
+// P1.3 TA0.2 CL
+// P1.4 TA0.3 BH PWM
+// P1.5 TA0.4 BL
+// P2.4 TA2.1 AH PWM
+// P2.5 TA2.2 AL
 
-// P1.2 TA0.1 CH
-// P1.3 TA0.2 CL PWM
-// P1.4 TA0.3 BH
-// P1.5 TA0.4 BL PWM
-// P2.4 TA2.1 AH
-// P2.5 TA2.2 AL PWM
-
-
+// mos driver pin
 // 2.4 BH AH
 // 2.5 BL AL
 // 1.4 GH BH
@@ -38,14 +38,10 @@
     }while(0)
 
 
-// #define PWM_TIMER_PERIOD 125
-// #define PWM_TIMER_PERIOD 125
-// #define PWM_MAX_COMPARE_VALUE 125
-
 #define PWM_TIMER_PERIOD 500
-#define PWM_MAX_COMPARE_VALUE 500
+#define PWM_MAX_COMPARE_VALUE 450
 
-#define DEFAULT_COMPARE_VALUE 62
+#define DEFAULT_COMPARE_VALUE 100
 
 #define HALL_SENSOR_ENCODE_OFFSET 0
 #define HAll_SENSOR_ENCODE_REVERSE 1 // ok
@@ -53,6 +49,10 @@
 
 #define MODE_MANUAL_PWM 0
 #define MODE_PI_SPEED 1
+
+// PI control PARAMETER
+#define INTEGRAL_MAX 100
+#define INTEGRAL_MIN -100
 
 // ### control parameter ###
 
@@ -71,7 +71,6 @@ extern float i_value;
 
 // ## measure value
 extern float current_speed;
-
 
 extern volatile uint32_t count_hall;
 extern volatile uint32_t count_pwm_interrupt;
