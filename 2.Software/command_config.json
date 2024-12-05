@@ -1,0 +1,77 @@
+{
+    "CMD_SET_POWER_EN": {
+        "code": "0x01",
+        "send_type": "TYPE_UINT8",
+        "response_type": "TYPE_NONE"
+    },
+    "CMD_GET_POWER_EN": {
+        "code": "0x02",
+        "send_type": "TYPE_NONE", 
+        "response_type": "TYPE_UINT8"
+    },
+    "CMD_SET_TARGET_SPEED": {
+        "code": "0x03",
+        "send_type": "TYPE_FLOAT", 
+        "response_type": "TYPE_NONE"
+    },
+    "CMD_GET_TARGET_SPEED": {
+        "code": "0x04",
+        "send_type": "TYPE_NONE", 
+        "response_type": "TYPE_FLOAT"
+    },
+    "CMD_SET_IS_REVERSE": {
+        "code": "0x05",
+        "send_type": "TYPE_UINT8", 
+        "response_type": "TYPE_NONE"
+    },
+    "CMD_GET_IS_REVERSE": {
+        "code": "0x06",
+        "send_type": "TYPE_NONE", 
+        "response_type": "TYPE_UINT8"
+    },
+    "CMD_SET_CONTROL_MODE": {
+        "code": "0x07",
+        "send_type": "TYPE_UINT8", 
+        "response_type": "TYPE_NONE"
+    },
+    "CMD_GET_CONTROL_MODE": {
+        "code": "0x08",
+        "send_type": "TYPE_NONE", 
+        "response_type": "TYPE_UINT8"
+    },
+    "CMD_SET_P_VALUE": {
+        "code": "0x09",
+        "send_type": "TYPE_FLOAT", 
+        "response_type": "TYPE_NONE"
+    },
+    "CMD_GET_P_VALUE": {
+        "code": "0x0A",
+        "send_type": "TYPE_NONE", 
+        "response_type": "TYPE_FLOAT"
+    },
+    "CMD_SET_I_VALUE": {
+        "code": "0x0B",
+        "send_type": "TYPE_FLOAT", 
+        "response_type": "TYPE_NONE"
+    },
+    "CMD_GET_I_VALUE": {
+        "code": "0x0C",
+        "send_type": "TYPE_NONE", 
+        "response_type": "TYPE_FLOAT"
+    },
+    "CMD_SET_PWM_COMPARE": {
+        "code": "0x0D",
+        "send_type": "TYPE_UINT16", 
+        "response_type": "TYPE_NONE"
+    },
+    "CMD_GET_PWM_COMPARE": {
+        "code": "0x0E",
+        "send_type": "TYPE_NONE", 
+        "response_type": "TYPE_UINT16"
+    },
+    "CMD_GET_CURRENT_SPEED": {
+        "code": "0x0F",
+        "send_type": "TYPE_NONE", 
+        "response_type": "TYPE_FLOAT"
+    }
+}
