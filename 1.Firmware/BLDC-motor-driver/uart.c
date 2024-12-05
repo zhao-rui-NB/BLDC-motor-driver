@@ -91,7 +91,7 @@ void uart_receive_interval_init(){
     // Timer_A_initUpMode(TIMER_A1_BASE, &timer_a1_para);
 
 
-    // to timer B 
+    //change to timer B 
     Timer_B_initUpModeParam initUpParam = {0};
     initUpParam.clockSource = TIMER_B_CLOCKSOURCE_SMCLK;
     initUpParam.clockSourceDivider = TIMER_B_CLOCKSOURCE_DIVIDER_1;

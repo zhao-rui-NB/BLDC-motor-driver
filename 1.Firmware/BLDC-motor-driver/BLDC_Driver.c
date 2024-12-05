@@ -168,29 +168,20 @@ void MOSGateDriver_by_hall_sensor(uint8_t hall_encode){
 __interrupt void TIMER0_A0_ISR (void){ // interrupt freq 25k hz
     __disable_interrupt();
 
-    // BLDC_controller_update();  
     hall_data = read_hall_sensor();
     if(!power_en)
         MOSGateDriver_write_disable();
     else
         MOSGateDriver_by_hall_sensor(hall_data);
-
-    // if the hall change add the count hall for calc speed
-    // if(hall_data!=last_hall_data){ // new hall data
-    //     last_hall_data = hall_data;
-    //     count_hall++;
-    // }
-
+    
+    // 2500 is 0.1s
     if(count_pwm_interrupt<2500){  // pass time counter, when 25000, pass 1s
         count_pwm_interrupt++;
     }
     else{ // time up, calc the motor speed 
 
         // GPIO_toggleOutputOnPin(GPIO_PORT_P1, GPIO_PIN0);
-        // current_speed = (float)count_hall/24.0*60.0  *10; // 0.1s
         count_pwm_interrupt = 0;
-        // count_hall = 0;
-
 
         if(control_mode == MODE_MANUAL_PWM){
             MOSGateDriver_write_duty(pwm_compare);
@@ -206,8 +197,11 @@ __interrupt void TIMER0_A0_ISR (void){ // interrupt freq 25k hz
 
             float duty = p_value * error + i_value * _integral; // 計算輸出
             duty = pwm_compare + duty;
-            if(duty<0){duty = 0;}
-            else if (duty>PWM_MAX_COMPARE_VALUE){ duty = PWM_MAX_COMPARE_VALUE; }
+            if(duty<MIN_PI_CONTROLLER_WRITE_DUTY)
+                duty = MIN_PI_CONTROLLER_WRITE_DUTY;
+            else if (duty>PWM_MAX_COMPARE_VALUE)
+                duty = PWM_MAX_COMPARE_VALUE;
+
             pwm_compare = duty;
             MOSGateDriver_write_duty(pwm_compare); // direct write the duty is ok, function will limit the value
 
@@ -227,7 +221,7 @@ void motor_speed_timer_init(){
     initContParam_TA1.startTimer = true;
     Timer_A_initContinuousMode(TIMER_A1_BASE, &initContParam_TA1);
 
-    GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_P2, GPIO_PIN0);
+    GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_P2, GPIO_PIN0); // read hall freq
 
     Timer_A_initCaptureModeParam initCaptureModeParam_TA1 = {0};
     initCaptureModeParam_TA1.captureInputSelect = TIMER_A_CAPTURE_INPUTSELECT_CCIxA;
@@ -238,15 +232,7 @@ void motor_speed_timer_init(){
 
     Timer_A_initCaptureMode(TIMER_A1_BASE, &initCaptureModeParam_TA1);
 
-
-
-
-
 }
-
-volatile float _speed_avg_buffer[3] = {0};
-volatile uint8_t _speed_avg_buffer_index = 0;
-
 
 
 #pragma vector=TIMER1_A1_VECTOR
@@ -266,7 +252,6 @@ __interrupt void TIMER1_A0_ISR (void){
             
             // _speed_avg_buffer[_speed_avg_buffer_index++ % 3] = 23437500 / (float)Timer_A_getCaptureCompareCount(TIMER_A1_BASE, TIMER_A_CAPTURECOMPARE_REGISTER_1);
             // current_speed = (_speed_avg_buffer[0] + _speed_avg_buffer[1] + _speed_avg_buffer[2])/3;
-
                 
             Timer_A_clear(TIMER_A1_BASE);            
             break;

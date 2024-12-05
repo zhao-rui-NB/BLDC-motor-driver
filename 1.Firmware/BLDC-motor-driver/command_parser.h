@@ -12,8 +12,6 @@ get speed: 0xAA 0x02 0x08
 
 */
 
-
-
 // 通訊協議常量定義
 #define FRAME_HEAD     0xAA
 // UINT8
@@ -55,14 +53,6 @@ void reply_status(uint8_t status);
 void reply_status_uint8(uint8_t status, uint8_t value);
 void reply_status_uint16(uint8_t status, uint16_t value);
 void parse_command(uint8_t *buffer, uint8_t length);
-
-
-
-
-
-
-
-
 
 
 

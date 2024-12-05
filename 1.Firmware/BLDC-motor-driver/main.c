@@ -6,13 +6,10 @@
 /*
 timer A0 A2 pwm for mos driver 
 timer A0 UP mode CCR0 interrupt for motor controller
-
+timer A1 Continuous ,CaptureMode read the hall motor speed from P2.0
 timer B0 CCR0 interrupt for uart split frame
 
 uart USCI A1 RX/TX command 
-
-
-
 */
 
 
@@ -54,9 +51,7 @@ void main (void){
     
     hall_sensor_init();
     MOSGateDriver_init();
-    
-
-motor_speed_timer_init();
+    motor_speed_timer_init();
 
     while(1){
 

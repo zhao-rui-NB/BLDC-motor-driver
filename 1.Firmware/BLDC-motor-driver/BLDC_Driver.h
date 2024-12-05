@@ -51,8 +51,9 @@
 #define MODE_PI_SPEED 1
 
 // PI control PARAMETER
-#define INTEGRAL_MAX 100
-#define INTEGRAL_MIN -100
+#define MIN_PI_CONTROLLER_WRITE_DUTY 50
+#define INTEGRAL_MAX 50
+#define INTEGRAL_MIN -50
 
 // ### control parameter ###
 
@@ -89,9 +90,7 @@ uint8_t read_hall_sensor();
 
 // ### controller
 void BLDC_controller_init();
-
-void BLDC_controller_update();
-
+void motor_speed_timer_init();
 
 
 // #####################
