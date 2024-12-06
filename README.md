@@ -1,160 +1,109 @@
-# BLDC-motor-driver
-
-
-
-
-# 通訊格式說明文件
-
-## 概述
-本協議用於控制 BLDC 馬達的指令與回應，採用固定結構設計，具備校驗功能以確保數據完整性。
-
----
+# BLDC馬達驅動器通訊協議
 
 ## 指令格式
 
-### **格式結構**
-指令由以下部分組成：
-- **Frame Head (1 byte)**: 固定值 `0xAA`，用於標識指令的起始。
-- **Command (1 byte)**: 功能碼，表示具體的操作。
-- **Parameter (可選, N bytes)**: 指令需要的參數，根據功能碼決定是否需要參數及其長度。
-- **Checksum (1 byte)**: 校驗碼，為 `frame_head + cmd + parameter` 的 XOR 運算結果。
+每個指令組包含以下元素：
+- **Frame Head (1 byte)**: 固定為 `0xAA`，表示指令的開始。
+- **Command (1 byte)**: 指令碼，代表要執行的操作。
+- **Parameters (可選, 多個bytes)**: 根據指令碼需要傳遞的參數。
+- **Checksum (1 byte)**: 透過 XOR 計算所有前面數據得到的校驗碼。
 
-### **格式範例**
-| Frame Head (0xAA) | Command | Parameter (可選) | Checksum |
+### 指令範例
 
+- **無參數指令**
+  - **指令**: 啟用/禁用馬達
+  - **數據**: `0xAA 0x03 0xXX 0xYY`
+    - `0xAA`: Frame Head
+    - `0x03`: Command (啟動或停止馬達)
+    - `0xXX`: Parameter (1 啟動, 0 停止)
+    - `0xYY`: Checksum
 
-
-#### **無參數指令**
-- **功能**: 查詢當前轉速
-- **數據**: `0xAA 0x02 0xA8`
-- **說明**:
-  - `0xAA`: Frame Head
-  - `0x02`: Command (CMD_GET_SPEED)
-  - `0xA8`: Checksum
-
-#### **帶參數指令**
-- **功能**: 設定目標轉速為 1500 RPM (`0x05DC`)
-- **數據**: `0xAA 0x01 0x05 0xDC 0x70`
-- **說明**:
-  - `0xAA`: Frame Head
-  - `0x01`: Command (CMD_SET_SPEED)
-  - `0x05DC`: Parameter (1500 RPM)
-  - `0x70`: Checksum
-
----
+- **帶參數指令**
+  - **指令**: 設定目標轉速
+  - **數據**: `0xAA 0x01 0xXX 0xYY 0xZZ`
+    - `0xAA`: Frame Head
+    - `0x01`: Command (設定轉速)
+    - `0xXX 0xYY`: Parameter (目標轉速值)
+    - `0xZZ`: Checksum
 
 ## 回應格式
 
-### **格式結構**
-回應由以下部分組成：
-- **Frame Head (1 byte)**: 固定值 `0xAA`，用於標識回應的起始。
-- **Status Code (1 byte)**: 回應狀態碼，表示指令執行情況。
-- **Reply Value (可選, N bytes)**: 回應的數據值，根據指令類型決定是否需要及其長度。
-- **Checksum (1 byte)**: 校驗碼，為 `frame_head + status_code + reply_value` 的 XOR 運算結果。
+每個回應組包含以下元素：
+- **Frame Head (1 byte)**: 固定為 `0xAA`，表示回應的開始。
+- **Status Code (1 byte)**: 指示操作成功或錯誤類型的狀態碼。
+- **Reply Value (可選, 多個bytes)**: 根據指令類型可能提供的回應數據。
+- **Checksum (1 byte)**: 透過 XOR 計算所有前面數據得到的校驗碼。
 
-### **格式範例**
-| Frame Head (0xAA) | Status Code | Reply Value (可選) | Checksum |
+### 回應範例
 
+- **無回應數據**
+  - **功能**: 停止馬達
+  - **數據**: `0xAA 0x00 0xAA`
+    - `0xAA`: Frame Head
+    - `0x00`: Status Code (STATUS_OK)
+    - `0xAA`: Checksum
 
-#### **無回應數據**
-- **功能**: 停止馬達
-- **數據**: `0xAA 0x00 0xAA`
-- **說明**:
-  - `0xAA`: Frame Head
-  - `0x00`: Status Code (STATUS_OK)
-  - `0xAA`: Checksum
-
-#### **帶回應數據**
-- **功能**: 查詢當前轉速，當前轉速為 1200 RPM (`0x04B0`)
-- **數據**: `0xAA 0x00 0x04 0xB0 0xFE`
-- **說明**:
-  - `0xAA`: Frame Head
-  - `0x00`: Status Code (STATUS_OK)
-  - `0x04B0`: Reply Value (1200 RPM)
-  - `0xFE`: Checksum
-
----
+- **帶回應數據**
+  - **功能**: 查詢目標轉速
+  - **數據**: `0xAA 0x00 0xXX 0xYY 0xZZ`
+    - `0xAA`: Frame Head
+    - `0x00`: Status Code (STATUS_OK)
+    - `0xXX 0xYY`: Reply Value (當前轉速值)
+    - `0xZZ`: Checksum
 
 ## 功能碼說明
 
-| 功能名稱             | 功能碼 (Command) | 參數 (Parameter)                   | 回應值 (Reply Value)                 |
-|----------------------|------------------|-------------------------------------|---------------------------------------|
-| 設定目標轉速         | `0x01`           | 16-bit 目標轉速值 (RPM)            | 無                                     |
-| 查詢當前轉速         | `0x02`           | 無                                  | 16-bit 當前轉速值 (RPM)               |
-| 控制馬達啟停         | `0x03`           | 1 byte (0 = 停止, 1 = 啟動)         | 無                                     |
-| 設定運行模式         | `0x04`           | 1 byte (0 = 手動, 1 = 自動)         | 無                                     |
-| 查詢系統狀態         | `0x05`           | 無                                  | 1 byte 狀態碼 (馬達運行狀態、錯誤等) |
-
----
+| 功能碼 | 描述                | 參數類型         | 回應類型         |
+|--------|-------------------|----------------|----------------|
+| `0x01` | 設定目標轉速       | 16-bit 數值 (RPM) | 無             |
+| `0x02` | 查詢目標轉速       | 無              | 16-bit 數值 (RPM) |
+| `0x03` | 啟動/停止馬達      | 1 byte (0/1)    | 無             |
+| `0x04` | 設定控制模式       | 1 byte (模式)    | 無             |
+| `0x05` | 查詢控制模式       | 無              | 1 byte (模式)    |
 
 ## 狀態碼說明
 
-| 狀態碼 (Status Code)    | 說明                              |
-|-------------------------|-----------------------------------|
-| `0x00` (STATUS_OK)      | 指令執行成功                      |
-| `0x01` (STATUS_INVALID_FRAME) | 無效的數據幀                      |
-| `0x02` (STATUS_CHECKSUM_ERROR) | 校驗碼錯誤                        |
-| `0x03` (STATUS_INVALID_CMD)    | 不支持的功能碼                    |
-| `0x04` (STATUS_INVALID_PARAM)  | 無效的參數                        |
+| 狀態碼 | 說明               |
+|--------|-------------------|
+| `0x00` | 指令執行成功       |
+| `0x01` | 無效的數據幀       |
+| `0x02` | 校驗碼錯誤         |
+| `0x03` | 不支持的功能碼     |
+| `0x04` | 無效的參數         |
 
----
+# BLDC馬達驅動器通訊協議
+
+## 功能碼與對應操作
+
+以下是所有可用的功能碼及其對應的操作說明：
+
+| 功能碼 | 功能名稱               | 功能說明                           |
+|--------|----------------------|------------------------------------|
+| `0x00` | CMD_SET_POWER_EN     | 設定馬達電源啟用狀態                 |
+| `0x01` | CMD_GET_POWER_EN     | 查詢馬達電源啟用狀態                 |
+| `0x02` | CMD_SET_TARGET_SPEED | 設定目標轉速                         |
+| `0x03` | CMD_GET_TARGET_SPEED | 查詢目標轉速                         |
+| `0x04` | CMD_SET_IS_REVERSE   | 設定馬達是否反轉                     |
+| `0x05` | CMD_GET_IS_REVERSE   | 查詢馬達是否反轉                     |
+| `0x06` | CMD_SET_CONTROL_MODE | 設定馬達控制模式                     |
+| `0x07` | CMD_GET_CONTROL_MODE | 查詢馬達控制模式                     |
+| `0x08` | CMD_SET_P_VALUE      | 設定PID控制器的比例增益P值           |
+| `0x09` | CMD_GET_P_VALUE      | 查詢PID控制器的比例增益P值           |
+| `0x0A` | CMD_SET_I_VALUE      | 設定PID控制器的積分增益I值           |
+| `0x0B` | CMD_GET_I_VALUE      | 查詢PID控制器的積分增益I值           |
+| `0x0C` | CMD_SET_PWM_COMPARE  | 設定PWM比較值                        |
+| `0x0D` | CMD_GET_PWM_COMPARE  | 查詢PWM比較值                        |
+| `0x0E` | CMD_GET_CURRENT_SPEED| 查詢當前轉速                         |
 
 ## 校驗碼計算方法
 
-校驗碼計算為所有數據字段的 XOR 運算結果。
+校驗碼的計算過程包括對指令的每一部分進行XOR運算。以下是計算校驗碼的一個例子：
 
-### **範例**
-- **指令**: `0xAA 0x01 0x05 0xDC`
-  - XOR 運算: `0xAA ^ 0x01 ^ 0x05 ^ 0xDC = 0x70`
-  - 校驗碼: `0x70`
+- **指令**: `0xAA 0x02 0x01`
+  - Frame Head = `0xAA`
+  - Command = `0x02`
+  - Parameter = `0x01`
+  - **XOR 運算**: `0xAA ^ 0x02 ^ 0x01 = 0xA9`
+  - 校驗碼: `0xA9`
 
----
-
-## 錯誤處理
-
-1. **校驗失敗**:
-   - 回應 `0xAA 0x02` (STATUS_CHECKSUM_ERROR)。
-2. **無效指令**:
-   - 回應 `0xAA 0x03` (STATUS_INVALID_CMD)。
-3. **參數錯誤**:
-   - 回應 `0xAA 0x04` (STATUS_INVALID_PARAM)。
-
----
-
-# sdfsdf
-
-
-
-# 通訊格式說明文件
-
-## 指令格式
-**結構**: `Frame Head (1B) + Command (1B) + Parameter (可選, N B) + Checksum (1B)`
-- **無參數範例**: `0xAA 0x02 0xA8` (查詢轉速)
-- **有參數範例**: `0xAA 0x01 0x05 0xDC 0x70` (設定轉速 1500 RPM)
-
-## 回應格式
-**結構**: `Frame Head (1B) + Status Code (1B) + Reply Value (可選, N B) + Checksum (1B)`
-- **無回應數據**: `0xAA 0x00 0xAA` (執行成功)
-- **有回應數據**: `0xAA 0x00 0x04 0xB0 0xFE` (回應轉速 1200 RPM)
-
-## 功能碼說明
-| 功能名稱       | 功能碼 | 參數             | 回應值             |
-|----------------|--------|------------------|--------------------|
-| 設定目標轉速   | `0x01` | 4 byte 轉速值    | 無                 |
-| 查詢當前轉速   | `0x02` | 無               | 4 byte 轉速值       |
-| 控制馬達啟停   | `0x03` | 1 byte: 0 停止/1 啟動 | 無                 |
-| 設定運行模式   | `0x04` | 1B: 0 手動PWM/1 自動PI | 無                 |
-
-## 狀態碼說明
-| 狀態碼  | 說明            |
-|---------|-----------------|
-| `0x00`  | 指令執行成功    |
-| `0x01`  | 無效數據幀      |
-| `0x02`  | 校驗碼錯誤      |
-| `0x03`  | 無效功能碼      |
-| `0x04`  | 無效參數        |
-
-## 校驗碼計算
-**方法**: 對所有字段取 XOR。
-- **範例**: `0xAA ^ 0x01 ^ 0x05 ^ 0xDC = 0x70`
-
+這份詳細的功能碼列表將有助於開發者或系統集成者準確地實施與BLDC馬達的通訊。
