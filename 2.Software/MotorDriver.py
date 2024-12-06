@@ -2,6 +2,7 @@ import json
 import serial
 import struct
 from enum import Enum, auto
+import asyncio
 
 class MotorDriver:
     # command enum
@@ -34,7 +35,25 @@ class MotorDriver:
     def __init__(self, port='COM4', baudrate=115200):
         with open('command_config.json', 'r') as f:
             self.command_config = json.load(f)
-        self.serial = serial.Serial(port, baudrate, timeout=2, inter_byte_timeout=0.3)
+            
+        self.serial = None
+        self.uart_lock = asyncio.Lock()
+        
+    def connect(self, port, baudrate):
+        if self.serial is not None and self.serial.is_open:
+            self.serial.close()
+        try:
+            self.serial = serial.Serial(port, baudrate, timeout=2, inter_byte_timeout=0.1)
+        except Exception as e:
+            print(e)
+            return False
+        return True
+    
+    def disconnect(self):
+        if self.serial is not None and self.serial.is_open:
+            self.serial.close()
+        self.serial = None
+        return True    
         
     def _calculate_checksum(self, data):
         checksum = 0
@@ -44,7 +63,10 @@ class MotorDriver:
     
     def _send_command(self, cmd_code:int, parameters: list[int]):
         # clear the buffer
-        self.serial.reset_input_buffer()
+        if self.serial:
+            self.serial.reset_input_buffer()
+        else:
+            return
         
         frame_head = 0xAA
         data = [frame_head, cmd_code] + parameters
@@ -54,6 +76,8 @@ class MotorDriver:
         self.serial.write(bytearray(data))
         
     def _receive_response(self):
+        if self.serial is None:
+            return None
         response = self.serial.read(100)
         return response
 
@@ -99,7 +123,7 @@ class MotorDriver:
         response = self._receive_response()
         
         # 校驗碼錯誤或幀頭不正確
-        if len(response)<3 or response[0] != 0xAA or response[-1] != self._calculate_checksum(response[:-1]):
+        if response==None or len(response)<3 or response[0] != 0xAA or response[-1] != self._calculate_checksum(response[:-1]):
             return None
 
         # 狀態碼不正確
@@ -113,6 +137,14 @@ class MotorDriver:
             return None
         
         return self._bytes_to_num(response_type, response[2:-1])
+    
+    
+    async def execute_command_async(self, command: CMDS, value=None):
+        async with self.uart_lock:
+            resault = await asyncio.to_thread(self.execute_command, command, value)
+            # return await asyncio.to_thread(self.execute_command, command, value)
+            # await asyncio.sleep(0.1)
+            return resault
         
 
 if __name__ == "__main__":

@@ -1,0 +1,36 @@
+Container {
+    height: auto;
+}
+
+Input {
+    height: 3;
+    width: 60%;
+    dock: right;
+}
+
+Label {
+    height: 3;
+    padding: 1;
+}
+
+Horizontal {
+    height: auto;
+}
+
+
+.spacer {
+    width: 1fr;
+
+}
+
+.hidden_class {
+    display: none;
+}
+
+.connected SelectCurrent{
+    background: $success 50%;
+}
+
+.nconnected SelectCurrent{
+    background: $error 50%;
+}

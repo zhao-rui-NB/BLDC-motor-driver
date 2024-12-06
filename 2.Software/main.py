@@ -1,281 +1,325 @@
-import serial
-import struct
+import serial.tools.list_ports
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, Select, Button, Static, Input
-from textual.screen import Screen
-from textual.containers import Container, Vertical, Horizontal
+from textual.containers import Container, Horizontal, Vertical, Grid
+from textual.widgets import Select, Button, Static, Label, Header, Footer, Digits, Input, Switch
+from textual.reactive import Reactive
+from textual.binding import Binding 
+from textual.validation import Integer, Number
+# key event import
+from textual.events import Key
 
-# Copy the constants and configuration from send_command.py
-FRAME_HEAD = 0xAA
+from textual.widgets._select import SelectOverlay
 
-# Command constants (copying from original script)
-CMD_SET_POWER_EN = 0x01
-CMD_GET_POWER_EN = 0x02
-CMD_SET_TARGET_SPEED = 0x03
-CMD_GET_TARGET_SPEED = 0x04
-CMD_SET_IS_REVERSE = 0x05
-CMD_GET_IS_REVERSE = 0x06
-CMD_SET_CONTROL_MODE = 0x07
-CMD_GET_CONTROL_MODE = 0x08
-CMD_SET_P_VALUE = 0x09
-CMD_GET_P_VALUE = 0x0A
-CMD_SET_I_VALUE = 0x0B
-CMD_GET_I_VALUE = 0x0C
-CMD_SET_PWM_COMPARE = 0x0D
-CMD_GET_PWM_COMPARE = 0x0E
-CMD_GET_CURRENT_SPEED = 0x0F
+from MotorDriver import MotorDriver  # 導入 MotorDriver 類
 
-# Data type constants
-TYPE_NONE = 0x00
-TYPE_FLOAT = 0x01
-TYPE_UINT16 = 0x02
-TYPE_UINT8 = 0x03
+from threading import Thread
+import asyncio
 
-# Mapping of commands to their descriptions
-COMMAND_MAP = {
-    CMD_SET_POWER_EN: "設置電源使能",
-    CMD_GET_POWER_EN: "獲取電源使能",
-    CMD_SET_TARGET_SPEED: "設置目標速度",
-    CMD_GET_TARGET_SPEED: "獲取目標速度",
-    CMD_SET_IS_REVERSE: "設置反向",
-    CMD_GET_IS_REVERSE: "獲取反向",
-    CMD_SET_CONTROL_MODE: "設置控制模式",
-    CMD_GET_CONTROL_MODE: "獲取控制模式",
-    CMD_SET_P_VALUE: "設置 P 值",
-    CMD_GET_P_VALUE: "獲取 P 值",
-    CMD_SET_I_VALUE: "設置 I 值",
-    CMD_GET_I_VALUE: "獲取 I 值",
-    CMD_SET_PWM_COMPARE: "設置 PWM 比較值",
-    CMD_GET_PWM_COMPARE: "獲取 PWM 比較值",
-    CMD_GET_CURRENT_SPEED: "獲取當前速度",
-}
+class SelectWithoutUpDown(Select):
+    Select.BINDINGS = [
+        Binding(key='enter,space', action='show_overlay', description='Show menu', show=False, key_display=None, priority=False, tooltip='', id=None)
+    ]
 
-# Mapping of command types
-SEND_DATA_TYPE = {
-    CMD_SET_POWER_EN: TYPE_UINT8,
-    CMD_SET_TARGET_SPEED: TYPE_FLOAT,
-    CMD_SET_IS_REVERSE: TYPE_UINT8,
-    CMD_SET_CONTROL_MODE: TYPE_UINT8,
-    CMD_SET_P_VALUE: TYPE_FLOAT,
-    CMD_SET_I_VALUE: TYPE_FLOAT,
-    CMD_SET_PWM_COMPARE: TYPE_UINT16,
-}
 
-RESPONSE_DATA_TYPE = {
-    CMD_GET_POWER_EN: TYPE_UINT8,
-    CMD_GET_TARGET_SPEED: TYPE_FLOAT,
-    CMD_GET_IS_REVERSE: TYPE_UINT8,
-    CMD_GET_CONTROL_MODE: TYPE_UINT8,
-    CMD_GET_P_VALUE: TYPE_FLOAT,
-    CMD_GET_I_VALUE: TYPE_FLOAT,
-    CMD_GET_PWM_COMPARE: TYPE_UINT16,
-    CMD_GET_CURRENT_SPEED: TYPE_FLOAT,
-}
 
-class SerialCommunication:
-    def __init__(self, port='COM4', baudrate=115200):
-        try:
-            self.ser = serial.Serial(port, baudrate, timeout=2, inter_byte_timeout=0.5)
-        except serial.SerialException as e:
-            print(f"Serial connection error: {e}")
-            self.ser = None
-
-    def calculate_checksum(self, data):
-        checksum = 0
-        for byte in data:
-            checksum ^= byte
-        return checksum
-
-    def send_command(self, command, parameters=[]):
-        if not self.ser:
-            return "Serial port not connected"
+class MotorControlApp(App):
+    CSS_PATH = 'main.css'
+    
+    BINDINGS = [
         
-        frame_head = 0xAA
-        data = [frame_head, command] + parameters
-        checksum = self.calculate_checksum(data)
-        data.append(checksum)
-        
-        try:
-            self.ser.write(bytearray(data))
-            return "指令發送成功: " + ' '.join(f"{byte:02X}" for byte in data)
-        except Exception as e:
-            return f"發送指令失敗: {e}"
-
-    def handle_command(self, command):
-        if not self.ser:
-            return "Serial port not connected"
-        
-        try:
-            response = list(self.ser.read_until())
-            
-            if len(response) < 3 or response[0] != 0xAA:
-                return "校驗碼錯誤或幀頭不正確"
-            
-            if response[1] != 0x00:
-                return f"錯誤: 狀態碼 {response[1]}"
-            
-            response_type = RESPONSE_DATA_TYPE.get(command, TYPE_NONE)
-            
-            if response_type == TYPE_FLOAT:
-                if len(response) == 7:
-                    value = struct.unpack('<f', bytes(response[2:6]))[0]
-                    return f"浮點回應值: {value}"
-                
-            elif response_type == TYPE_UINT16:
-                if len(response) == 5:
-                    value = struct.unpack('<H', bytes(response[2:4]))[0]
-                    return f"UINT16 回應值: {value}"
-                
-            elif response_type == TYPE_UINT8:
-                if len(response) == 4:
-                    value = response[2]
-                    return f"UINT8 回應值: {value}"
-            
-            return "回應成功，無額外數據"
-        
-        except Exception as e:
-            return f"接收回應失敗: {e}"
-
-class SerialControlApp(App):
-    """Textual Serial Control Panel Application"""
+        ("ctrl+t", "toggle_dark", "Toggle dark"),
+        ("ctrl+r", "reload_driver_parameters", "reload"),
+        # toggle power on/off
+        ("ctrl+o", "toggle_power", "Toggle Power On/Off"),
+        # direction switch
+        ("ctrl+d", "toggle_direction", "Toggle Direction"),
+    ]
     
-    CSS___ = """
-    Screen {
-        background: black;
-        color: white;
-    }
+    def __init__(self):
+        super().__init__()
+        self.motor_driver = MotorDriver()
+        self.speed_timer = None
     
-    #command-select {
-        width: 50%;
-        margin: 1 1;
-    }
-    
-    #input-container {
-        height: 5;
-        margin: 1 1;
-        padding: 1 1;
-        border: tall $text;
-    }
-    
-    #response-display {
-        height: 10;
-        border: tall $primary;
-        padding: 1 1;
-        overflow-y: auto;
-    }
-    
-    Button {
-        width: auto;
-        margin: 1 1;
-        background: $primary 40%;
-    }
-    
-    Button:hover {
-        background: $primary 60%;
-    }
-    """
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.serial_comm = SerialCommunication()
-        self.responses = []
-
-    def compose(self) -> ComposeResult:
-        yield Header(show_clock=True)
-        
-        with Container(id="main-container"):
-            # Command Selection Dropdown
-            yield Select(
-                [(description, command) for command, description in COMMAND_MAP.items()], 
-                prompt="選擇指令", 
-                id="command-select"
-            )
-            
-            # Input Container for data entry
-            with Container(id="input-container"):
-                yield Input(placeholder="輸入數值（如需要）", id="data-input")
-            
-            # Buttons for actions
-            with Horizontal(id="action-buttons"):
-                yield Button("發送指令", variant="primary", id="send-btn")
-                yield Button("獲取回應", variant="success", id="get-response-btn")
-            
-            # Response Display
-            with Container(id="response-display"):
-                yield Static("回應將顯示在此處", id="response-text")
-
+    def compose(self):
+        yield Header("Motor Control")
         yield Footer()
+        
+        with Container(id="connection"):
+            with Horizontal():
+                # yield Static("Select Serial Port:")
+                yield SelectWithoutUpDown([],id="com_port_select", prompt="Select COM Port", classes="nconnected")
+                yield Button("Scan Ports", id="scan_button")
+                yield Button("Connect", id="connect_button")                
+                yield Button("Disconnect", id="disconnect_button", classes="hidden_class")
 
+        
+        with Horizontal():
+            yield Label("Current Speed:")
+            yield Digits("2009.87", id="speed_display")
+
+
+        with Horizontal():
+            yield Label("POWER ON/OFF:", id="power_label")
+            yield Switch(id="power_switch")
+            
+            yield Label("Direction:", id="direction_label")
+            yield Switch(id="direction_switch")
+            
+            # add a space make button align right
+            yield Static("", classes="spacer")
+            
+            yield Button("RELOAD PARAMETER", id="reload")
+        
+        # the control type select pwm or pid
+        with Horizontal():
+            yield Label("Control Type:")
+            yield SelectWithoutUpDown([("PWM","PWM"), ("PI Speed","PI Speed")], id="control_type_select", prompt="Select Control Type")
+            
+        
+        with Container(id="pwm_patameters" , classes="hidden_class"):
+            with Horizontal():
+                yield Label("PWM compare value:")
+                yield Input(placeholder="Enter PWM compare value", id="pwm_input", validators=Integer(minimum=0, maximum=500))
+            
+        with Container(id="pid_patameters", classes="hidden_class"):
+            with Horizontal():
+                yield Label("Kp:")
+                yield Input(placeholder="Enter Kp float", id="kp_input", validators=Number(minimum=0))
+            with Horizontal():
+                yield Label("Ki:")
+                yield Input(placeholder="Enter Ki float", id="ki_input", validators=Number(minimum=0))
+
+            with Horizontal():
+                yield Label("Target Speed:")
+                yield Input(placeholder="Enter Target ", id="target_speed_input", validators=Number(minimum=0, maximum=10000))
+
+    def action_toggle_dark(self) -> None:
+        self.theme = ("textual-dark" if self.theme == "textual-light" else "textual-light")
+
+    def action_toggle_power(self):
+        power_switch = self.query_one("#power_switch", Switch)
+        power_switch.value = not power_switch.value
+        
+    def action_toggle_direction(self):
+        direction_switch = self.query_one("#direction_switch", Switch)
+        direction_switch.value = not direction_switch.value
+
+    def on_key(self, event: Key):
+        print(event)
+        
+        if event.key == "left":
+            if isinstance(self.focused, SelectOverlay):
+                return
+            self.action_focus_previous()
+        
+        elif event.key == "right":
+            if isinstance(self.focused, SelectOverlay):
+                return
+            self.action_focus_next()
+            
+        elif event.key == "up":
+            if isinstance(self.focused, SelectOverlay):
+                return
+            self.action_focus_previous()
+            
+        elif event.key == "down":
+            if isinstance(self.focused, SelectOverlay):
+                return
+            self.action_focus_next()
+            
+
+    
+    def _scan_ports(self):
+        ports = serial.tools.list_ports.comports()
+        port_options = [(f'{port.device}\t{port.description}', port.device) for port in ports]
+        select = self.query_one("#com_port_select", Select)
+        select.set_options(port_options)  # 更新選項
+        print("Scanning Ports")
+        
+    # when scan button is pressed scan the com ports, and update the select widget
+    async def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "scan_button":
+            print("Scan Button Pressed")
+            self._scan_ports()
+
+            
+        elif event.button.id == "connect_button":
+            print("Connect Button Pressed")
+            select = self.query_one("#com_port_select", Select)
+            selected_port = select.value
+            if selected_port:
+                connect_succ = self.motor_driver.connect(selected_port, 115200)
+                if connect_succ:
+                    print("Connected")
+                    con_container = self.query_one("#connection", Container)
+                    con_container.add_class("connected")
+                    self.query_one("#com_port_select", Select).add_class("connected")
+                    self.query_one("#com_port_select", Select).remove_class("nconnected")
+                    
+                    self.query_one("#connect_button", Button).add_class("hidden_class")
+                    self.query_one("#disconnect_button", Button).remove_class("hidden_class")
+                else:
+                    print("Connection Failed")
+                    con_container = self.query_one("#connection", Container)
+                    con_container.remove_class("connected")
+                    self.query_one("#com_port_select", Select).add_class("nconnected")
+                    self.query_one("#com_port_select", Select).remove_class("connected")
+                    
+                    self.query_one("#connect_button", Button).remove_class("hidden_class")
+                    self.query_one("#disconnect_button", Button).add_class("hidden_class")
+                    
+                    if self.speed_timer:
+                        self.speed_timer.stop()
+                        self.speed_timer = None
+                    
+            self.speed_timer = self.set_interval(0.8, self._update_speed)  # 每秒更新速度
+        
+        elif event.button.id == "disconnect_button":
+            print("Disconnect Button Pressed")
+            disconnect_succ = self.motor_driver.disconnect()
+            if disconnect_succ:
+                print("Disconnected")
+                self.query_one("#com_port_select", Select).add_class("nconnected")
+                self.query_one("#com_port_select", Select).remove_class("connected")
+                
+                self.query_one("#connect_button", Button).remove_class("hidden_class")
+                self.query_one("#disconnect_button", Button).add_class("hidden_class")
+                
+                if self.speed_timer:
+                    self.speed_timer.stop()
+                    self.speed_timer = None
+                    
+                self._clear_all_widget_data()
+    
+        elif event.button.id == "reload":
+            print("Reload Button Pressed")
+            
+            # self._reload_driver_partameters()
+            await self._action_reload_driver_parameters()
+                    
+        
+    async def on_select_changed(self, event: Select.Changed):
+        # print which select is changed
+        if event.select.id == "control_type_select":
+            if event.value == "PWM":
+                print("PWM Selected")
+                self.query_one("#pwm_patameters").remove_class("hidden_class")
+                self.query_one("#pid_patameters").add_class("hidden_class")
+                await self.motor_driver.execute_command_async(MotorDriver.CMDS.CMD_SET_CONTROL_MODE, 0)
+                
+            elif event.value == "PI Speed":
+                print("PI Speed Selected")
+                self.query_one("#pwm_patameters").add_class("hidden_class")
+                self.query_one("#pid_patameters").remove_class("hidden_class")
+                await self.motor_driver.execute_command_async(MotorDriver.CMDS.CMD_SET_CONTROL_MODE, 1)
+            
+        elif event.select.id == "control_type_select":
+            print("Control Type Changed")
+            await self.motor_driver.execute_command_async(MotorDriver.CMDS.CMD_SET_CONTROL_MODE, 0 if event.value == "PWM" else 1)            
+                
+    async def on_switch_changed(self, event: Switch.Changed):
+        if event.switch.id == "power_switch":
+            print("Power Switch Changed")
+            await self.motor_driver.execute_command_async(MotorDriver.CMDS.CMD_SET_POWER_EN, 1 if event.value else 0)
+            
+        elif event.switch.id == "direction_switch":
+            print("Direction Switch Changed")
+            await self.motor_driver.execute_command_async(MotorDriver.CMDS.CMD_SET_IS_REVERSE, 1 if event.value else 0)
+            
+    async def on_input_submitted(self, event: Input.Submitted):
+        if event.input.id == "target_speed_input":
+            print("Target Speed Submitted")
+            if len(event.validation_result.failures)==0:
+                await self.motor_driver.execute_command_async(MotorDriver.CMDS.CMD_SET_TARGET_SPEED, float(event.value))
+            
+        elif event.input.id == "pwm_input":
+            print("PWM Compare Submitted")
+            if len(event.validation_result.failures)==0:
+                await self.motor_driver.execute_command_async(MotorDriver.CMDS.CMD_SET_PWM_COMPARE, int(event.value))
+            
+        elif event.input.id == "kp_input":
+            print("Kp Submitted")
+            if len(event.validation_result.failures)==0:
+                await self.motor_driver.execute_command_async(MotorDriver.CMDS.CMD_SET_P_VALUE, float(event.value))
+            
+        elif event.input.id == "ki_input":
+            print("Ki Submitted")
+            if len(event.validation_result.failures)==0:
+                await self.motor_driver.execute_command_async(MotorDriver.CMDS.CMD_SET_I_VALUE, float(event.value))                
+    
     def on_mount(self):
-        self.query_one("#send-btn").on_click(self.send_command)
-        self.query_one("#get-response-btn").on_click(self.get_response)
-        self.query_one("#command-select").on_change(self.on_command_change)
-
-    def on_command_change(self, message):
-        # Reset input when command changes
-        self.query_one("#data-input").value = ""
-        
-        # Check if selected command requires input
-        command = message.value
-        if command in SEND_DATA_TYPE:
-            input_type = SEND_DATA_TYPE[command]
-            placeholders = {
-                TYPE_FLOAT: "輸入浮點數",
-                TYPE_UINT16: "輸入 16 位無符號整數",
-                TYPE_UINT8: "輸入 8 位無符號整數"
-            }
-            self.query_one("#data-input").placeholder = placeholders.get(input_type, "輸入數值")
+        self._scan_ports()
+    
+    # motor driver api
+    async def _update_speed(self):
+        speed = await self.motor_driver.execute_command_async(MotorDriver.CMDS.CMD_GET_CURRENT_SPEED)
+        speed = f"{speed:.4f}" if speed is not None else "0"
+        if speed is not None:
+            speed_display = self.query_one("#speed_display", Digits)
+            speed_display.update(speed)
         else:
-            self.query_one("#data-input").placeholder = "此指令不需要輸入"
-
-    def send_command(self, _):
-        # Get selected command and input value
-        command = self.query_one("#command-select").value
-        input_value = self.query_one("#data-input").value
-        
-        try:
-            # Prepare data based on command type
-            data_type = SEND_DATA_TYPE.get(command, TYPE_NONE)
+            speed_display = self.query_one("#speed_display", Digits)
+            speed_display.update("Error Reading Speed")
             
-            if data_type == TYPE_FLOAT and input_value:
-                data = struct.pack('<f', float(input_value))
-            elif data_type == TYPE_UINT16 and input_value:
-                data = struct.pack('<H', int(input_value))
-            elif data_type == TYPE_UINT8 and input_value:
-                data = bytes([int(input_value)])
-            else:
-                data = []
-            
-            # Send command
-            result = self.serial_comm.send_command(command, list(data))
-            self.update_response(result)
+        await asyncio.sleep(0.1)
+    
+    
+    def _clear_all_widget_data(self):
+        self.query_one("#speed_display", Digits).update("0")
+        self.query_one("#power_switch", Switch).value = False
+        self.query_one("#direction_switch", Switch).value = False
+        self.query_one("#target_speed_input", Input).value = ""
+        self.query_one("#control_type_select", Select).value = Select.BLANK
+        self.query_one("#pwm_input", Input).value = ""
+        self.query_one("#kp_input", Input).value = ""
+        self.query_one("#ki_input", Input).value = ""
         
-        except ValueError:
-            self.update_response("輸入值格式錯誤")
-        except Exception as e:
-            self.update_response(f"發送指令失敗: {e}")
-
-    def get_response(self, _):
-        # Get selected command
-        command = self.query_one("#command-select").value
+    
+    async def _action_reload_driver_parameters(self):
         
-        # Handle response
-        result = self.serial_comm.handle_command(command)
-        self.update_response(result)
-
-    def update_response(self, message):
-        # Add message to responses and update display
-        self.responses.append(message)
-        if len(self.responses) > 10:
-            self.responses.pop(0)
+        self._clear_all_widget_data()
+        # await asyncio.sleep(dlt)
         
-        # Update response text
-        response_text = "\n".join(self.responses)
-        self.query_one("#response-text").update(response_text)
+        power_en = await self.motor_driver.execute_command_async(MotorDriver.CMDS.CMD_GET_POWER_EN)
+        power_switch = self.query_one("#power_switch", Switch)
+        power_switch.value = True if power_en == 1 else False
+        
+        is_reverse = await self.motor_driver.execute_command_async(MotorDriver.CMDS.CMD_GET_IS_REVERSE)
+        direction_switch = self.query_one("#direction_switch", Switch)
+        direction_switch.value = True if is_reverse == 1 else False
 
-def main():
-    app = SerialControlApp()
-    app.run()
+        
+        target_speed = await self.motor_driver.execute_command_async(MotorDriver.CMDS.CMD_GET_TARGET_SPEED)
+        target_speed_input = self.query_one("#target_speed_input", Input)
+        target_speed_input.value = f'{target_speed:.2f}' if target_speed is not None else ""
+
+        control_mode = await self.motor_driver.execute_command_async(MotorDriver.CMDS.CMD_GET_CONTROL_MODE)
+        control_type_select = self.query_one("#control_type_select", Select)
+        if control_mode == 0:
+            control_type_select.value = "PWM"
+        elif control_mode == 1:
+            control_type_select.value = "PI Speed"
+        else:
+            control_type_select.value = Select.BLANK
+                         
+        
+        pwm_compare = await self.motor_driver.execute_command_async(MotorDriver.CMDS.CMD_GET_PWM_COMPARE)
+        pwm_input = self.query_one("#pwm_input", Input)
+        pwm_input.value = f'{pwm_compare}' if pwm_compare is not None else ""
+        
+        p_value = await self.motor_driver.execute_command_async(MotorDriver.CMDS.CMD_GET_P_VALUE)
+        kp_input = self.query_one("#kp_input", Input)
+        kp_input.value = f'{p_value:.2f}' if p_value is not None else ""
+        
+        i_value = await self.motor_driver.execute_command_async(MotorDriver.CMDS.CMD_GET_I_VALUE)
+        ki_input = self.query_one("#ki_input", Input)
+        ki_input.value = f'{i_value:.2f}' if i_value is not None else ""
+        print("Reloaded")
+    
+    
+
+
 
 if __name__ == "__main__":
-    main()
+    app = MotorControlApp()
+    app.run()
