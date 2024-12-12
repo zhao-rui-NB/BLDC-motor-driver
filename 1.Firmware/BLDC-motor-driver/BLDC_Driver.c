@@ -17,8 +17,8 @@ uint16_t pwm_compare = DEFAULT_COMPARE_VALUE;
 
 // pid speed control
 float target_speed = 2000;
-float p_value = 0.08;
-float i_value = 0.00;
+float p_value = 0.06;
+float i_value = 0.02;
 
 // ## measure value
 float current_speed;

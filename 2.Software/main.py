@@ -291,7 +291,7 @@ class MotorControlApp(App):
         
         target_speed = await self.motor_driver.execute_command_async(MotorDriver.CMDS.CMD_GET_TARGET_SPEED)
         target_speed_input = self.query_one("#target_speed_input", Input)
-        target_speed_input.value = f'{target_speed:.2f}' if target_speed is not None else ""
+        target_speed_input.value = f'{target_speed:.4f}' if target_speed is not None else ""
 
         control_mode = await self.motor_driver.execute_command_async(MotorDriver.CMDS.CMD_GET_CONTROL_MODE)
         control_type_select = self.query_one("#control_type_select", Select)
@@ -309,11 +309,11 @@ class MotorControlApp(App):
         
         p_value = await self.motor_driver.execute_command_async(MotorDriver.CMDS.CMD_GET_P_VALUE)
         kp_input = self.query_one("#kp_input", Input)
-        kp_input.value = f'{p_value:.2f}' if p_value is not None else ""
+        kp_input.value = f'{p_value:.4f}' if p_value is not None else ""
         
         i_value = await self.motor_driver.execute_command_async(MotorDriver.CMDS.CMD_GET_I_VALUE)
         ki_input = self.query_one("#ki_input", Input)
-        ki_input.value = f'{i_value:.2f}' if i_value is not None else ""
+        ki_input.value = f'{i_value:.4f}' if i_value is not None else ""
         print("Reloaded")
     
     
