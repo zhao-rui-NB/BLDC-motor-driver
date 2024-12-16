@@ -9,6 +9,8 @@
   * 轉速顯示
 * P2.1 按鈕啟用油門把手控制馬達
 
+## BLDC
+[BLDC S42BL61](https://item.taobao.com/item.htm?id=659081527323&spm=a21wu.12321156-tw.0.0.7e981a07XwIgJo&sku_properties=-1%3A-1%3B-2%3A-2%3B-3%3A-3)
 
 ## mcu
 * [MSP430F5529](https://www.ti.com/product/zh-tw/MSP430F5529)
