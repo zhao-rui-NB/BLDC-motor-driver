@@ -43,6 +43,7 @@
 | Timer A0 | CCR0 interrupt | 用來更新馬達PWM duty |
 | Timer A2 | UP MODE | MOS上管 PWM產生 |
 | Timer B0 | UP MODE interrupt | 用來分割uart封包的間隔 |
+| Timer A1 | ContinuousMode, P2.0 CaptureMode Input| 讀取HALL週期,算轉速 |
 | USCI A1  | uart 電腦通訊 | baud 115200 |
 
 
